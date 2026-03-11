@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Penyetan 234</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <meta name="theme-color" content="#4CAF50">
+    <link rel="apple-touch-icon" sizes="180x180" href="favicon/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="favicon/favicon-16x16.png">
+<link rel="manifest" href="favicon/site.webmanifest">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'waktoo-green': '#4CAF50',
+                        'waktoo-dark': '#388E3C',
+                        'waktoo-bg': '#F5F5F5',
+                        'waktoo-light': '#E8F5E9',
+                    },
+                    fontFamily: { sans: ['Inter', 'sans-serif'] }
+                }
+            }
+        }
+    </script>
+    
+        <link rel="stylesheet" href="style.css">
+
+</head>
+
+<body class="flex justify-center min-h-screen text-gray-800 font-sans">
+    
+    <div id="app-container" class="w-full max-w-md bg-gray-50 min-h-screen relative shadow-2xl overflow-hidden flex flex-col">
+        <div class="flex items-center justify-center h-screen">
+            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-waktoo-green"></div>
+        </div>
+    </div>
+    
+    <div id="toast-container" class="fixed top-5 left-0 right-0 flex justify-center px-4">
+        <div class="bg-gray-800 text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 text-sm font-medium">
+            <div class="bg-green-500 rounded-full p-1"><i data-lucide="info" class="w-3 h-3 text-white"></i></div>
+            <span id="toast-message">Notifikasi</span>
+        </div>
+    </div>
+    
+    <div id="modal-overlay" class="fixed inset-0 bg-black/50 z-50 hidden transition-opacity opacity-0 max-w-md mx-auto" onclick="closeModal()"></div>
+    <div id="bottom-sheet" class="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white rounded-t-2xl z-50 bottom-sheet pb-6 shadow-[0_-5px_20px_rgba(0,0,0,0.1)]">
+        <div class="w-12 h-1 bg-gray-300 rounded-full mx-auto mt-3 mb-4"></div>
+        <div id="sheet-content" class="px-5 max-h-[70vh] overflow-y-auto"></div>
+    </div>
+    
+    <script type="module" src="main.js"></script>
+</body>
+
+</html>

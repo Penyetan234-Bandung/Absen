@@ -1,0 +1,49 @@
+       body {
+            background-color: #e5e5e5;
+        }
+        
+        ::-webkit-scrollbar {
+            width: 0px;
+            background: transparent;
+        }
+        
+        /* Animations */
+        .page-enter {
+            animation: fadeIn 0.3s ease-in-out;
+        }
+        
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        /* Bottom Sheet Transition */
+        .bottom-sheet {
+            transition: transform 0.3s ease-out;
+            transform: translateY(100%);
+        }
+        
+        .bottom-sheet.open {
+            transform: translateY(0);
+        }
+        
+        /* Toast Notification */
+        #toast-container {
+            transition: transform 0.3s ease, opacity 0.3s ease;
+            transform: translateY(-20px);
+            opacity: 0;
+            pointer-events: none;
+            z-index: 100;
+        }
+        
+        #toast-container.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
