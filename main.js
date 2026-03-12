@@ -126,107 +126,118 @@
             });
         };
         // --- ABSENSI LOGIC ---
-        window.handleAbsenAction = async (type) => {
-            if (!currentUser) return showToast("Harus login!");
-            const shiftVal = document.getElementById('shift-select').value;
-            
-// --- 1. WAJIB CEK LOKASI GPS SEBELUM PROSES ---
-showToast("Mencari titik lokasi Anda...");
-let lokasiUser;
-try {
-    lokasiUser = await dapatkanLokasi();
-    const jarak = hitungJarak(lokasiUser.lat, lokasiUser.lng, KANTOR_LAT, KANTOR_LNG);
+// --- ABSENSI LOGIC ---
+window.handleAbsenAction = async (type) => {
+    if (!currentUser) return showToast("Harus login!");
+    const shiftVal = document.getElementById('shift-select').value;
     
-    // Kalau jaraknya melebihi batas, hentikan proses!
-    if (jarak > MAKSIMAL_JARAK_METER) {
-        // Kita tampilkan seberapa jauh HP-nya menebak secara meleset
-        return showToast(`Jarakmu ${Math.round(jarak)}m (Batas ${MAKSIMAL_JARAK_METER}m). Akurasi HP meleset ${Math.round(lokasiUser.akurasi)}m. Coba keluar ruangan!`);
+    // --- 1. CEK LOKASI GPS & TANDAI JIKA DI LUAR AREA ---
+    showToast("Mencari titik lokasi Anda...");
+    let lokasiUser = { lat: 0, lng: 0 }; // Koordinat nol jika GPS mati
+    let isDiLuarArea = false;
+    let jarakMeter = 0;
+    
+    try {
+        lokasiUser = await dapatkanLokasi();
+        const jarak = hitungJarak(lokasiUser.lat, lokasiUser.lng, KANTOR_LAT, KANTOR_LNG);
+        jarakMeter = Math.round(jarak);
+        
+        // Kalau jaraknya melebihi batas, TETAP IZINKAN tapi tandai merah!
+        if (jarak > MAKSIMAL_JARAK_METER) {
+            isDiLuarArea = true;
+            showToast(`Absen dicatat (Di Luar Area: ${jarakMeter}m)`);
+        }
+    } catch (errMsg) {
+        // Jika GPS mati atau akses ditolak, tetap izinkan tapi tandai!
+        isDiLuarArea = true;
+        jarakMeter = -1; // Angka -1 sebagai penanda GPS mati
+        showToast("Absen dicatat (GPS Dimatikan)");
     }
-} catch (errMsg) {
-    return showToast(errMsg);
-}
-            
-            // --- 2. CEK FORMAT TANGGAL HARI INI ---
-            const divisiUser = currentUserProfile?.divisi || "Tidak Diketahui";
-            const namaUser = currentUserProfile?.nama || currentUser.email.split('@')[0];
-            const dateObj = new Date();
-            const todayStr = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`;
-            
-            // --- 3. CEK APAKAH SUDAH ABSEN HARI INI ---
-            showToast("Memverifikasi data absen...");
-            try {
-                const qCek = query(collection(db, "absensi"), where("uid", "==", currentUser.uid), where("tanggal", "==", todayStr), where("tipe", "==", type));
-                const snapCek = await getDocs(qCek);
-                if (!snapCek.empty) return showToast(`Gagal: Kamu sudah ${type} hari ini!`);
-            } catch (err) {
-                console.error("Gagal mengecek data absen ganda:", err);
-            }
-            
-            // --- 4. LOGIKA JADWAL & KETERLAMBATAN ---
-            const jadwalShift = {
-                "Shift Pagi": { masuk: { jam: 8, menit: 0 }, pulang: { jam: 16, menit: 0 } },
-                "Shift S": { masuk: { jam: 12, menit: 0 }, pulang: { jam: 21, menit: 0 } },
-                "Shift S1": { masuk: { jam: 10, menit: 0 }, pulang: { jam: 20, menit: 0 } },
-                "Shift S2": { masuk: { jam: 12, menit: 0 }, pulang: { jam: 20, menit: 0 } },
-                "Shift S3": { masuk: { jam: 12, menit: 0 }, pulang: { jam: 22, menit: 0 } },
-                "Shift Malam": { masuk: { jam: 14, menit: 0 }, pulang: { jam: 22, menit: 0 } }
-            };
-            
-            const shiftAktif = jadwalShift[shiftVal];
-            if (!shiftAktif) return showToast("Pilih shift terlebih dahulu!");
-            
-            const waktuSekarang = new Date();
-            const jamSekarang = waktuSekarang.getHours();
-            const menitSekarang = waktuSekarang.getMinutes();
-            const totalMenitSekarang = (jamSekarang * 60) + menitSekarang;
-            let statusAbsen = "Tepat Waktu";
-            
-            if (type === 'Clock In') {
-                const waktuMasuk = shiftAktif.masuk;
-                const totalMenitMasuk = (waktuMasuk.jam * 60) + waktuMasuk.menit;
-                if (totalMenitSekarang > (totalMenitMasuk + 5)) statusAbsen = "Terlambat";
-            }
-            else if (type === 'Clock Out') {
-                const waktuPulang = shiftAktif.pulang;
-                const totalMenitPulang = (waktuPulang.jam * 60) + waktuPulang.menit;
-                if (totalMenitSekarang < totalMenitPulang) {
-                    return showToast(`Belum bisa pulang! Jam pulang: ${waktuPulang.jam.toString().padStart(2, '0')}.${waktuPulang.menit.toString().padStart(2, '0')}`);
-                }
-                statusAbsen = "Sudah Pulang";
-            }
-            else if (type === 'Clock In Lembur') {
-                const waktuPulang = shiftAktif.pulang;
-                const totalMenitPulang = (waktuPulang.jam * 60) + waktuPulang.menit;
-                if (totalMenitSekarang < totalMenitPulang) {
-                    return showToast(`Belum waktunya lembur! Shift reguler berakhir jam ${waktuPulang.jam.toString().padStart(2, '0')}.${waktuPulang.menit.toString().padStart(2, '0')}`);
-                }
-                statusAbsen = "Lembur";
-            }
-            else if (type === 'Clock Out Lembur') {
-                statusAbsen = "Selesai Lembur";
-            }
-            
-            // --- 5. PROSES SIMPAN KE DATABASE (Beserta Koordinat GPS) ---
-            showToast(`Mencatat ${type}...`);
-            try {
-                await addDoc(collection(db, "absensi"), {
-                    tipe: type,
-                    status: statusAbsen,
-                    shift: shiftVal,
-                    uid: currentUser.uid,
-                    nama: namaUser,
-                    email: currentUser.email,
-                    divisi: divisiUser,
-                    tanggal: todayStr,
-                    lokasi: { lat: lokasiUser.lat, lng: lokasiUser.lng }, // Simpan rekam jejak koordinatnya!
-                    waktu: serverTimestamp(),
-                    device: navigator.userAgent
-                });
-                showToast(`${type} Berhasil!`);
-            } catch (e) {
-                showToast("Gagal simpan!");
-            }
-        };
+    
+    // --- 2. CEK FORMAT TANGGAL HARI INI ---
+    const divisiUser = currentUserProfile?.divisi || "Tidak Diketahui";
+    const namaUser = currentUserProfile?.nama || currentUser.email.split('@')[0];
+    const dateObj = new Date();
+    const todayStr = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`;
+    
+    // --- 3. CEK APAKAH SUDAH ABSEN HARI INI ---
+    showToast("Memverifikasi data absen...");
+    try {
+        const qCek = query(collection(db, "absensi"), where("uid", "==", currentUser.uid), where("tanggal", "==", todayStr), where("tipe", "==", type));
+        const snapCek = await getDocs(qCek);
+        if (!snapCek.empty) return showToast(`Gagal: Kamu sudah ${type} hari ini!`);
+    } catch (err) {
+        console.error("Gagal mengecek data absen ganda:", err);
+    }
+    
+    // --- 4. LOGIKA JADWAL & KETERLAMBATAN ---
+    const jadwalShift = {
+        "Shift Pagi": { masuk: { jam: 8, menit: 0 }, pulang: { jam: 16, menit: 0 } },
+        "Shift S": { masuk: { jam: 12, menit: 0 }, pulang: { jam: 21, menit: 0 } },
+        "Shift S1": { masuk: { jam: 10, menit: 0 }, pulang: { jam: 20, menit: 0 } },
+        "Shift S2": { masuk: { jam: 12, menit: 0 }, pulang: { jam: 20, menit: 0 } },
+        "Shift S3": { masuk: { jam: 12, menit: 0 }, pulang: { jam: 22, menit: 0 } },
+        "Shift Malam": { masuk: { jam: 14, menit: 0 }, pulang: { jam: 22, menit: 0 } }
+    };
+    
+    const shiftAktif = jadwalShift[shiftVal];
+    if (!shiftAktif) return showToast("Pilih shift terlebih dahulu!");
+    
+    const waktuSekarang = new Date();
+    const jamSekarang = waktuSekarang.getHours();
+    const menitSekarang = waktuSekarang.getMinutes();
+    const totalMenitSekarang = (jamSekarang * 60) + menitSekarang;
+    let statusAbsen = "Tepat Waktu";
+    
+    if (type === 'Clock In') {
+        const waktuMasuk = shiftAktif.masuk;
+        const totalMenitMasuk = (waktuMasuk.jam * 60) + waktuMasuk.menit;
+        if (totalMenitSekarang > (totalMenitMasuk + 5)) statusAbsen = "Terlambat";
+    }
+    else if (type === 'Clock Out') {
+        const waktuPulang = shiftAktif.pulang;
+        const totalMenitPulang = (waktuPulang.jam * 60) + waktuPulang.menit;
+        if (totalMenitSekarang < totalMenitPulang) {
+            return showToast(`Belum bisa pulang! Jam pulang: ${waktuPulang.jam.toString().padStart(2, '0')}.${waktuPulang.menit.toString().padStart(2, '0')}`);
+        }
+        statusAbsen = "Sudah Pulang";
+    }
+    else if (type === 'Clock In Lembur') {
+        const waktuPulang = shiftAktif.pulang;
+        const totalMenitPulang = (waktuPulang.jam * 60) + waktuPulang.menit;
+        if (totalMenitSekarang < totalMenitPulang) {
+            return showToast(`Belum waktunya lembur! Shift reguler berakhir jam ${waktuPulang.jam.toString().padStart(2, '0')}.${waktuPulang.menit.toString().padStart(2, '0')}`);
+        }
+        statusAbsen = "Lembur";
+    }
+    else if (type === 'Clock Out Lembur') {
+        statusAbsen = "Selesai Lembur";
+    }
+    
+    // --- 5. PROSES SIMPAN KE DATABASE (Beserta Info Pelanggaran Jarak) ---
+    showToast(`Mencatat ${type}...`);
+    try {
+        await addDoc(collection(db, "absensi"), {
+            tipe: type,
+            status: statusAbsen,
+            shift: shiftVal,
+            uid: currentUser.uid,
+            nama: namaUser,
+            email: currentUser.email,
+            divisi: divisiUser,
+            tanggal: todayStr,
+            lokasi: { lat: lokasiUser.lat, lng: lokasiUser.lng },
+            diLuarArea: isDiLuarArea, // <-- INFO BARU UNTUK MANAGER
+            jarakMeter: jarakMeter, // <-- INFO BARU UNTUK MANAGER
+            waktu: serverTimestamp(),
+            device: navigator.userAgent
+        });
+        showToast(`${type} Berhasil!`);
+        setTimeout(() => renderHome(), 1000);
+    } catch (e) {
+        showToast("Gagal simpan!");
+    }
+};
         
         window.saveJadwal = async () => {
             if (!currentUser) return showToast("Harus login!");
@@ -376,13 +387,21 @@ try {
                 });
                 
                 let listHTML = filteredData.map(d => {
-                    const isAbsent = d.status === 'Tidak Hadir';
-                    const borderColor = isAbsent ? 'border-red-500' : 'border-gray-200';
-                    const statusColor = isAbsent ? 'text-red-500' : 'text-green-600';
-                    const avatarColor = isAbsent ? 'bg-red-100 text-red-500' : 'bg-blue-100 text-blue-600';
-                    const displayTime = d.waktu?.toDate ? d.waktu.toDate().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '--:--';
-                    
-                    return `
+    const isAbsent = d.status === 'Tidak Hadir';
+    const avatarColor = isAbsent ? 'bg-red-100 text-red-500' : 'bg-blue-100 text-blue-600';
+    const displayTime = d.waktu?.toDate ? d.waktu.toDate().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '--:--';
+    
+    // --- LOGIKA LABEL LOKASI ---
+    let badgeLokasi = '';
+    if (d.diLuarArea) {
+        // Jika di luar area, tampilkan jaraknya atau tulisan "Tanpa GPS"
+        const teksJarak = d.jarakMeter > 0 ? `${d.jarakMeter}m` : 'Tanpa GPS';
+        badgeLokasi = `<span class="text-[9px] font-bold text-red-600 bg-red-100 px-2 py-0.5 rounded border border-red-200">Luar Area (${teksJarak})</span>`;
+    } else if (d.diLuarArea === false) {
+        badgeLokasi = `<span class="text-[9px] font-bold text-green-600 bg-green-100 px-2 py-0.5 rounded border border-green-200">Di Outlet</span>`;
+    }
+    
+    return `
                     <div class="flex items-center gap-4 p-4 border-b border-gray-100 hover:bg-gray-50 transition page-enter bg-white">
                         <div class="relative">
                             <div class="w-12 h-12 rounded-full ${avatarColor} flex items-center justify-center font-bold text-lg border-2 ${isAbsent ? 'border-red-500' : 'border-blue-200'}">
@@ -390,12 +409,14 @@ try {
                             </div>
                         </div>
                         <div class="flex-1">
-                            <h3 class="font-bold text-gray-800 text-sm">${d.nama || d.email.split('@')[0]}</h3>
-                            <p class="text-xs text-gray-400">${d.divisi}</p>
-                            <p class="text-xs ${statusColor} font-medium mt-1">${d.status} • ${displayTime}</p>
+                            <div class="flex items-center justify-between mb-0.5">
+                                <h3 class="font-bold text-gray-800 text-sm">${d.nama || d.email.split('@')[0]}</h3>
+                                ${badgeLokasi} </div>
+                            <p class="text-xs text-gray-400">${d.divisi} • ${d.tipe}</p>
+                            <p class="text-xs font-bold ${d.status === 'Terlambat' ? 'text-red-500' : 'text-green-600'} mt-1">${d.status} • ${displayTime}</p>
                         </div>
                     </div>`;
-                }).join('');
+}).join('');
                 
                 const today = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
                 
