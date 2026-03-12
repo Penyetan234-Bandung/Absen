@@ -85,8 +85,8 @@
         };
         // --- PENGATURAN LOKASI KANTOR (GEOFENCING) ---
         // Kordinat untuk 3J8C+RM Malabar, Bandung (Silakan sesuaikan angka di belakang koma jika kurang akurat)
-        const KANTOR_LAT = -6.924844;
-        const KANTOR_LNG = 107.622617;
+        const KANTOR_LAT = -6.9329083;
+        const KANTOR_LNG = 107.6217072;
         const MAKSIMAL_JARAK_METER = 100; // Karyawan maksimal berjarak 50 meter dari titik kantor
         
         // Fungsi menghitung jarak antara 2 koordinat (Rumus Haversine)
