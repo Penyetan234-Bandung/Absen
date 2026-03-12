@@ -83,39 +83,44 @@
                 showToast("Anda telah keluar");
             } catch (e) {}
         };
-        // --- PENGATURAN LOKASI KANTOR (GEOFENCING) ---
-        // Kordinat untuk 3J8C+RM Malabar, Bandung (Silakan sesuaikan angka di belakang koma jika kurang akurat)
-        const KANTOR_LAT = -6.9329083;
-        const KANTOR_LNG = 107.6217072;
-        const MAKSIMAL_JARAK_METER = 1000; // Karyawan maksimal berjarak 50 meter dari titik kantor
+// --- PENGATURAN LOKASI KANTOR (GEOFENCING) ---
+        // Kordinat untuk 3J8C+RM Malabar, Bandung
+        const KANTOR_LAT = -6.924844; // Pastikan titik ini tepat di atap bangunan
+        const KANTOR_LNG = 107.622617; 
         
-        // Fungsi menghitung jarak antara 2 koordinat (Rumus Haversine)
+        // UBAH: Perbesar toleransi menjadi 150 atau 200 meter agar tidak terlalu sensitif
+        const MAKSIMAL_JARAK_METER = 150; 
+
         window.hitungJarak = (lat1, lon1, lat2, lon2) => {
-            const R = 6371e3; // Radius bumi dalam meter
+            const R = 6371e3; 
             const dLat = (lat2 - lat1) * Math.PI / 180;
             const dLon = (lon2 - lon1) * Math.PI / 180;
-            const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-                Math.sin(dLon / 2) * Math.sin(dLon / 2);
-            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-            return R * c; // Hasil akhir berupa hitungan meter
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                      Math.sin(dLon/2) * Math.sin(dLon/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return R * c; 
         };
-        
-        // Fungsi menyalakan GPS dan membaca lokasi perangkat
+
         window.dapatkanLokasi = () => {
             return new Promise((resolve, reject) => {
                 if (!navigator.geolocation) {
                     reject("Browser/Perangkat Anda tidak mendukung fitur lokasi GPS.");
                 } else {
                     navigator.geolocation.getCurrentPosition(
-                        (position) => resolve({ lat: position.coords.latitude, lng: position.coords.longitude }),
+                        (position) => resolve({ 
+                            lat: position.coords.latitude, 
+                            lng: position.coords.longitude,
+                            akurasi: position.coords.accuracy // <-- KITA AMBIL TINGKAT MELESETNYA
+                        }),
                         (error) => {
                             let msg = "Gagal mengambil lokasi.";
                             if (error.code === 1) msg = "Akses lokasi ditolak! Harap nyalakan GPS dan izinkan browser mengakses lokasi.";
                             if (error.code === 2) msg = "Sinyal GPS tidak ditemukan atau lemah.";
                             if (error.code === 3) msg = "Waktu tunggu pencarian GPS habis.";
                             reject(msg);
-                        }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 } // Memaksa akurasi paling tinggi
+                        },
+                        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
                     );
                 }
             });
@@ -125,21 +130,21 @@
             if (!currentUser) return showToast("Harus login!");
             const shiftVal = document.getElementById('shift-select').value;
             
-            // --- 1. WAJIB CEK LOKASI GPS SEBELUM PROSES ---
-            showToast("Mencari titik lokasi Anda...");
-            let lokasiUser;
-            try {
-                lokasiUser = await dapatkanLokasi(); // Menunggu GPS menyala
-                const jarak = hitungJarak(lokasiUser.lat, lokasiUser.lng, KANTOR_LAT, KANTOR_LNG);
-                
-                // Kalau jaraknya melebihi batas (50 meter), hentikan proses!
-                if (jarak > MAKSIMAL_JARAK_METER) {
-                    return showToast(`Gagal! Anda berjarak ${Math.round(jarak)}m dari kantor. (Maksimal ${MAKSIMAL_JARAK_METER}m)`);
-                }
-            } catch (errMsg) {
-                // Kalau GPS mati atau belum diberi izin
-                return showToast(errMsg);
-            }
+// --- 1. WAJIB CEK LOKASI GPS SEBELUM PROSES ---
+showToast("Mencari titik lokasi Anda...");
+let lokasiUser;
+try {
+    lokasiUser = await dapatkanLokasi();
+    const jarak = hitungJarak(lokasiUser.lat, lokasiUser.lng, KANTOR_LAT, KANTOR_LNG);
+    
+    // Kalau jaraknya melebihi batas, hentikan proses!
+    if (jarak > MAKSIMAL_JARAK_METER) {
+        // Kita tampilkan seberapa jauh HP-nya menebak secara meleset
+        return showToast(`Jarakmu ${Math.round(jarak)}m (Batas ${MAKSIMAL_JARAK_METER}m). Akurasi HP meleset ${Math.round(lokasiUser.akurasi)}m. Coba keluar ruangan!`);
+    }
+} catch (errMsg) {
+    return showToast(errMsg);
+}
             
             // --- 2. CEK FORMAT TANGGAL HARI INI ---
             const divisiUser = currentUserProfile?.divisi || "Tidak Diketahui";
