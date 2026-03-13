@@ -104,29 +104,33 @@ const MAKSIMAL_JARAK_METER = 500;
             return R * c; 
         };
 
-        window.dapatkanLokasi = () => {
-            return new Promise((resolve, reject) => {
-                if (!navigator.geolocation) {
-                    reject("Browser/Perangkat Anda tidak mendukung fitur lokasi GPS.");
-                } else {
-                    navigator.geolocation.getCurrentPosition(
-                        (position) => resolve({ 
-                            lat: position.coords.latitude, 
-                            lng: position.coords.longitude,
-                            akurasi: position.coords.accuracy // <-- KITA AMBIL TINGKAT MELESETNYA
-                        }),
-                        (error) => {
-                            let msg = "Gagal mengambil lokasi.";
-                            if (error.code === 1) msg = "Akses lokasi ditolak! Harap nyalakan GPS dan izinkan browser mengakses lokasi.";
-                            if (error.code === 2) msg = "Sinyal GPS tidak ditemukan atau lemah.";
-                            if (error.code === 3) msg = "Waktu tunggu pencarian GPS habis.";
-                            reject(msg);
-                        },
-                        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
-                    );
-                }
-            });
-        };
+// Fungsi menyalakan GPS dan membaca lokasi perangkat (Versi Super Cepat)
+window.dapatkanLokasi = () => {
+    return new Promise((resolve, reject) => {
+        if (!navigator.geolocation) {
+            reject("Browser tidak mendukung GPS.");
+        } else {
+            navigator.geolocation.getCurrentPosition(
+                (position) => resolve({
+                    lat: position.coords.latitude,
+                    lng: position.coords.longitude,
+                    akurasi: position.coords.accuracy
+                }),
+                (error) => {
+                    let msg = "Gagal mengambil lokasi.";
+                    if (error.code === 1) msg = "Akses lokasi ditolak! Harap nyalakan GPS.";
+                    if (error.code === 2) msg = "Sinyal GPS tidak ditemukan.";
+                    if (error.code === 3) msg = "Waktu tunggu pencarian GPS habis.";
+                    reject(msg);
+                },
+                // RAHASIA KECEPATANNYA ADA DI BARIS INI:
+                // maximumAge: 60000 -> Boleh pakai memori lokasi 1 menit (60 detik) terakhir
+                // timeout: 7000 -> Jangan membuat karyawan menunggu lebih dari 7 detik
+                { enableHighAccuracy: true, timeout: 7000, maximumAge: 60000 }
+            );
+        }
+    });
+};
         // --- ABSENSI LOGIC ---
 // --- ABSENSI LOGIC ---
 window.handleAbsenAction = async (type) => {
