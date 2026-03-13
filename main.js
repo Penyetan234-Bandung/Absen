@@ -87,8 +87,8 @@
         // Kordinat untuk 3J8C+RM Malabar, Bandung
 // --- PENGATURAN LOKASI KANTOR (GEOFENCING) ---
 // Titik Lokasi Outlet Penyetan 234 Asli
-const KANTOR_LAT = -6.9328730;
-const KANTOR_LNG = 107.6217548;
+const KANTOR_LAT = -6.932922;
+const KANTOR_LNG = 107.621736;
 
 // Jarak toleransi (Bisa kamu atur 100, 150, atau 200 meter)
 const MAKSIMAL_JARAK_METER = 500;
