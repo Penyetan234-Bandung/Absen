@@ -183,7 +183,7 @@ window.handleAbsenAction = async (type) => {
         "Shift S1": { masuk: { jam: 10, menit: 0 }, pulang: { jam: 20, menit: 0 } },
         "Shift S2": { masuk: { jam: 12, menit: 0 }, pulang: { jam: 20, menit: 0 } },
         "Shift S3": { masuk: { jam: 12, menit: 0 }, pulang: { jam: 22, menit: 0 } },
-        "Shift Malam": { masuk: { jam: 14, menit: 0 }, pulang: { jam: 22, menit: 0 } }
+        "Shift Malam": { masuk: { jam: 15, menit: 0 }, pulang: { jam: 22, menit: 0 } }
     };
     
     const shiftAktif = jadwalShift[shiftVal];
