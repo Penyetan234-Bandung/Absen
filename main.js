@@ -659,7 +659,7 @@ window.handleAbsenAction = async (type) => {
                             <option value="Shift S1">Shift S1 (10.00-20.00)</option>
                             <option value="Shift S2">Shift S2 (12.00-20.00)</option>
                             <option value="Shift S3">Shift S3 (12.00-22.00)</option>
-                            <option value="Shift Malam">Shift Malam (14.00-22.00)</option>
+                            <option value="Shift Malam">Shift Malam (15.00-22.00)</option>
                         </select>
                     </div>
                 </div>
@@ -793,7 +793,7 @@ window.handleAbsenAction = async (type) => {
                                 <option value="Shift S1">Shift S1 (10.00-20.00)</option>
                                 <option value="Shift S2">Shift S2 (12.00-20.00)</option>
                                 <option value="Shift S3">Shift S3 (12.00-22.00)</option>
-                                <option value="Shift Malam">Shift Malam (14.00-22.00)</option>
+                                <option value="Shift Malam">Shift Malam (15.00-22.00)</option>
                                 <option value="Libur/Off">Libur / Off</option>
                             </select>
                             
