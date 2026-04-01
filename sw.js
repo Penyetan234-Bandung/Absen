@@ -1,5 +1,5 @@
 // Nama cache kita
-const CACHE_NAME = 'penyetan-pwa-v1';
+const CACHE_NAME = 'penyetan-pwa-v2';
 
 // Daftar file yang akan disimpan di memori HP (agar bisa dimuat lebih cepat)
 const urlsToCache = [
