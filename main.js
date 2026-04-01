@@ -363,51 +363,61 @@ window.handleAbsenAction = async (type) => {
                 overlay.classList.add('hidden');
             }, 300);
         };
-        // --- PAGE: ABSENSI HARIAN (Sesuai Screenshot) ---
-        let activeFilters = { status: [], divisi: [] };
+// --- PAGE: ABSENSI HARIAN ---
+// Buat fungsi kecil untuk mendapatkan tanggal hari ini format YYYY-MM-DD
+const getTodayStr = () => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+// Jadikan hari ini sebagai filter bawaan
+let activeFilters = { status: [], divisi: [], tanggal: getTodayStr() };
         
-        window.renderDailyAttendance = async () => {
-            updateView(`<div class="flex flex-col items-center justify-center h-screen gap-4"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-waktoo-green"></div><span class="text-gray-500">Memuat Data Absensi...</span></div>`);
+window.renderDailyAttendance = async () => {
+    updateView(`<div class="flex flex-col items-center justify-center h-screen gap-4"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-waktoo-green"></div><span class="text-gray-500">Memuat Data Absensi...</span></div>`);
+    
+    try {
+        // 1. Panggil data dari database KHUSUS TANGGAL YANG DIPILIH saja (Tanpa index tambahan)
+        const q = query(collection(db, "absensi"), where("tanggal", "==", activeFilters.tanggal));
+        const snap = await getDocs(q);
+        
+        let allData = [];
+        snap.forEach(doc => {
+            let d = doc.data();
+            d.id = doc.id;
+            if (!d.divisi) d.divisi = DIVISI_LIST[Math.floor(Math.random() * DIVISI_LIST.length)];
+            if (!d.status) d.status = d.tipe === 'Clock In' ? 'Tepat Waktu' : 'Sudah Pulang';
+            allData.push(d);
+        });
+        
+        // 2. Urutkan manual (jam terbaru di atas) pakai JavaScript agar tidak butuh Index
+        allData.sort((a, b) => {
+            const timeA = a.waktu?.toMillis ? a.waktu.toMillis() : 0;
+            const timeB = b.waktu?.toMillis ? b.waktu.toMillis() : 0;
+            return timeB - timeA;
+        });
+        
+        // 3. FILTERING LOGIC (Status & Divisi)
+        let filteredData = allData.filter(item => {
+            const statusMatch = activeFilters.status.length === 0 || activeFilters.status.includes(item.status);
+            const divisiMatch = activeFilters.divisi.length === 0 || activeFilters.divisi.includes(item.divisi);
+            return statusMatch && divisiMatch;
+        });
+        
+        // 4. BENTUK TAMPILAN KARTUNYA
+        let listHTML = filteredData.map(d => {
+            const isAbsent = d.status === 'Tidak Hadir';
+            const avatarColor = isAbsent ? 'bg-red-100 text-red-500' : 'bg-blue-100 text-blue-600';
+            const displayTime = d.waktu?.toDate ? d.waktu.toDate().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '--:--';
             
-            try {
-                // Ambil data absensi hari ini (Query sederhana: ambil semua yg terbaru)
-                // Note: Idealnya query by date, tapi untuk demo kita ambil limit 50 terakhir
-                const q = query(collection(db, "absensi"), orderBy("waktu", "desc"));
-                const snap = await getDocs(q);
-                
-                let allData = [];
-                snap.forEach(doc => {
-                    let d = doc.data();
-                    d.id = doc.id;
-                    // Mock data jika field belum ada (agar tampilan tidak rusak)
-                    if (!d.divisi) d.divisi = DIVISI_LIST[Math.floor(Math.random() * DIVISI_LIST.length)];
-                    if (!d.status) d.status = d.tipe === 'Clock In' ? 'Tepat Waktu' : 'Sudah Pulang';
-                    allData.push(d);
-                });
-                
-                // FILTERING LOGIC (Client Side)
-                let filteredData = allData.filter(item => {
-                    const statusMatch = activeFilters.status.length === 0 || activeFilters.status.includes(item.status);
-                    const divisiMatch = activeFilters.divisi.length === 0 || activeFilters.divisi.includes(item.divisi);
-                    return statusMatch && divisiMatch;
-                });
-                
-                let listHTML = filteredData.map(d => {
-    const isAbsent = d.status === 'Tidak Hadir';
-    const avatarColor = isAbsent ? 'bg-red-100 text-red-500' : 'bg-blue-100 text-blue-600';
-    const displayTime = d.waktu?.toDate ? d.waktu.toDate().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '--:--';
-    
-    // --- LOGIKA LABEL LOKASI ---
-    let badgeLokasi = '';
-    if (d.diLuarArea) {
-        // Jika di luar area, tampilkan jaraknya atau tulisan "Tanpa GPS"
-        const teksJarak = d.jarakMeter > 0 ? `${d.jarakMeter}m` : 'Tanpa GPS';
-        badgeLokasi = `<span class="text-[9px] font-bold text-red-600 bg-red-100 px-2 py-0.5 rounded border border-red-200">Luar Area (${teksJarak})</span>`;
-    } else if (d.diLuarArea === false) {
-        badgeLokasi = `<span class="text-[9px] font-bold text-green-600 bg-green-100 px-2 py-0.5 rounded border border-green-200">Di Outlet</span>`;
-    }
-    
-    return `
+            let badgeLokasi = '';
+            if (d.diLuarArea) {
+                const teksJarak = d.jarakMeter > 0 ? `${d.jarakMeter}m` : 'Tanpa GPS';
+                badgeLokasi = `<span class="text-[9px] font-bold text-red-600 bg-red-100 px-2 py-0.5 rounded border border-red-200">Luar Area (${teksJarak})</span>`;
+            } else if (d.diLuarArea === false) {
+                badgeLokasi = `<span class="text-[9px] font-bold text-green-600 bg-green-100 px-2 py-0.5 rounded border border-green-200">Di Outlet</span>`;
+            }
+            
+            return `
                     <div class="flex items-center gap-4 p-4 border-b border-gray-100 hover:bg-gray-50 transition page-enter bg-white">
                         <div class="relative">
                             <div class="w-12 h-12 rounded-full ${avatarColor} flex items-center justify-center font-bold text-lg border-2 ${isAbsent ? 'border-red-500' : 'border-blue-200'}">
@@ -417,16 +427,18 @@ window.handleAbsenAction = async (type) => {
                         <div class="flex-1">
                             <div class="flex items-center justify-between mb-0.5">
                                 <h3 class="font-bold text-gray-800 text-sm">${d.nama || d.email.split('@')[0]}</h3>
-                                ${badgeLokasi} </div>
+                                ${badgeLokasi}
+                            </div>
                             <p class="text-xs text-gray-400">${d.divisi} • ${d.tipe}</p>
                             <p class="text-xs font-bold ${d.status === 'Terlambat' ? 'text-red-500' : 'text-green-600'} mt-1">${d.status} • ${displayTime}</p>
                         </div>
                     </div>`;
-}).join('');
-                
-                const today = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
-                
-                updateView(`
+        }).join('');
+        
+        // Ubah format tanggal menjadi lebih cantik untuk dibaca di header
+        const displayDateStr = new Date(activeFilters.tanggal).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+        
+        updateView(`
                     <div class="bg-white min-h-screen pb-24">
                         <div class="sticky top-0 bg-white z-20 px-4 py-3 flex items-center justify-between border-b shadow-sm">
                             <button onclick="renderHome()"><i data-lucide="arrow-left" class="text-gray-600"></i></button>
@@ -434,28 +446,36 @@ window.handleAbsenAction = async (type) => {
                             <button onclick="toggleSearch()"><i data-lucide="search" class="text-gray-600"></i></button>
                         </div>
 
-                        <div class="px-4 py-3 bg-gray-50 flex justify-between items-center">
-                            <span class="text-sm text-gray-500 font-medium">${today}</span>
+                        <div class="px-4 py-3 bg-gray-50 flex justify-between items-center border-b border-gray-100">
+                            <div class="flex items-center gap-2">
+                                <i data-lucide="calendar" class="w-4 h-4 text-gray-400"></i>
+                                <span class="text-sm text-gray-600 font-bold">${displayDateStr}</span>
+                            </div>
                             <button onclick="openFilterModal()" class="flex items-center gap-2 px-3 py-1.5 bg-white border border-blue-500 text-blue-600 rounded-lg text-sm font-medium shadow-sm active:bg-blue-50">
                                 Filter <i data-lucide="filter" class="w-4 h-4"></i>
                             </button>
                         </div>
 
                         <div class="flex flex-col">
-                            ${listHTML || '<div class="p-10 text-center text-gray-400 text-sm">Tidak ada data ditemukan sesuai filter.</div>'}
+                            ${listHTML || '<div class="p-10 text-center text-gray-400 text-sm">Belum ada data absensi untuk tanggal ini.</div>'}
                         </div>
                     </div>
 
                     <div id="filter-modal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-end justify-center transition-opacity">
                         <div class="bg-white w-full max-w-md rounded-t-2xl max-h-[90vh] flex flex-col bottom-sheet">
                             <div class="p-4 border-b flex justify-between items-center sticky top-0 bg-white rounded-t-2xl z-10">
-                                <h3 class="font-bold text-lg">Filter</h3>
+                                <h3 class="font-bold text-lg">Filter Data</h3>
                                 <button onclick="closeFilterModal()"><i data-lucide="x" class="text-gray-400"></i></button>
                             </div>
                             
                             <div class="overflow-y-auto p-4 space-y-6">
                                 <div>
-                                    <h4 class="font-semibold text-gray-700 mb-3">Status</h4>
+                                    <h4 class="font-semibold text-gray-700 mb-3 text-sm">Pilih Tanggal</h4>
+                                    <input type="date" id="filter-tanggal" value="${activeFilters.tanggal}" class="w-full p-3 border border-gray-200 rounded-xl text-gray-700 focus:outline-none focus:border-green-500 shadow-sm">
+                                </div>
+
+                                <div>
+                                    <h4 class="font-semibold text-gray-700 mb-3 text-sm">Status Kehadiran</h4>
                                     <div class="space-y-3">
                                         ${STATUS_LIST.map(s => `
                                             <label class="flex items-center gap-3 cursor-pointer">
@@ -467,7 +487,7 @@ window.handleAbsenAction = async (type) => {
                                 </div>
 
                                 <div>
-                                    <h4 class="font-semibold text-gray-700 mb-3">Divisi</h4>
+                                    <h4 class="font-semibold text-gray-700 mb-3 text-sm">Divisi</h4>
                                     <div class="grid grid-cols-2 gap-3">
                                         ${DIVISI_LIST.map(d => `
                                             <label class="flex items-center gap-3 cursor-pointer">
@@ -480,25 +500,24 @@ window.handleAbsenAction = async (type) => {
                             </div>
 
                             <div class="p-4 border-t flex gap-3 sticky bottom-0 bg-white">
-                                <button onclick="closeFilterModal()" class="flex-1 py-3 border border-gray-300 rounded-lg text-gray-600 font-medium">Batal</button>
-                                <button onclick="applyFilter()" class="flex-1 py-3 bg-green-600 text-white rounded-lg font-bold shadow-md hover:bg-green-700">Simpan</button>
+                                <button onclick="closeFilterModal()" class="flex-1 py-3 border border-gray-300 rounded-lg text-gray-600 font-medium active:scale-95 transition">Batal</button>
+                                <button onclick="applyFilter()" class="flex-1 py-3 bg-green-600 text-white rounded-lg font-bold shadow-md hover:bg-green-700 active:scale-95 transition">Terapkan Filter</button>
                             </div>
                         </div>
                     </div>
-
                     ${bottomNav('absensi')}
                 `);
-                
-                // Set checkbox state based on activeFilters
-                document.querySelectorAll('.filter-status').forEach(cb => cb.checked = activeFilters.status.includes(cb.value));
-                document.querySelectorAll('.filter-divisi').forEach(cb => cb.checked = activeFilters.divisi.includes(cb.value));
-                
-            } catch (e) {
-                console.error(e);
-                showToast("Gagal memuat data");
-                renderHome();
-            }
-        };
+        
+        // Kembalikan status centang sesuai data terakhir
+        document.querySelectorAll('.filter-status').forEach(cb => cb.checked = activeFilters.status.includes(cb.value));
+        document.querySelectorAll('.filter-divisi').forEach(cb => cb.checked = activeFilters.divisi.includes(cb.value));
+        
+    } catch (e) {
+        console.error(e);
+        showToast("Gagal memuat data");
+        renderHome();
+    }
+};
         // --- PAGE: RIWAYAT ABSENSI PRIBADI ---
         window.renderRiwayatPribadi = async () => {
             updateView(`<div class="flex flex-col items-center justify-center h-screen gap-4"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-waktoo-green"></div><span class="text-gray-500">Memuat Riwayat...</span></div>`);
@@ -613,16 +632,22 @@ window.handleAbsenAction = async (type) => {
             }, 300);
         };
         
-        window.applyFilter = () => {
-            const statusCheckboxes = document.querySelectorAll('.filter-status:checked');
-            const divisiCheckboxes = document.querySelectorAll('.filter-divisi:checked');
-            
-            activeFilters.status = Array.from(statusCheckboxes).map(cb => cb.value);
-            activeFilters.divisi = Array.from(divisiCheckboxes).map(cb => cb.value);
-            
-            closeFilterModal();
-            renderDailyAttendance(); // Re-render with filters
-        };
+window.applyFilter = () => {
+    const statusCheckboxes = document.querySelectorAll('.filter-status:checked');
+    const divisiCheckboxes = document.querySelectorAll('.filter-divisi:checked');
+    
+    // Simpan tanggal yang dipilih
+    const tanggalInput = document.getElementById('filter-tanggal').value;
+    if (tanggalInput) {
+        activeFilters.tanggal = tanggalInput;
+    }
+    
+    activeFilters.status = Array.from(statusCheckboxes).map(cb => cb.value);
+    activeFilters.divisi = Array.from(divisiCheckboxes).map(cb => cb.value);
+    
+    closeFilterModal();
+    renderDailyAttendance(); // Muat ulang layar absen
+};
         
         // --- PAGE: HOME ---
         let intervalJam = null; // Variabel penampung detak jam
